@@ -4,7 +4,6 @@ import 'services/image_service.dart';
 import 'package:provider/provider.dart';
 import 'providers/order_provider.dart';
 
-
 void main() {
   runApp(
     ChangeNotifierProvider(
