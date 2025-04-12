@@ -13,7 +13,7 @@ class UploadReceiptScreen extends StatelessWidget {
 
   return Scaffold(
     appBar: AppBar(title: Text('Upload Receipt')),
-    body: Center( // ← Обернули Column в Center
+    body: Center( 
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
