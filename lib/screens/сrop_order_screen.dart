@@ -137,7 +137,7 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const SensorPage(), // Импортируйте SensorPage
+                      builder: (context) => const SensorPage(),
                     ),
                   );
                 },

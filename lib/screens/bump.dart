@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'dart:math';
+import 'package:vibration/vibration.dart'; 
 import 'package:geolocator_android/geolocator_android.dart';
 import 'package:geolocator_apple/geolocator_apple.dart';
-import 'package:vibration/vibration.dart'; 
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 class SensorPage extends StatefulWidget {
   const SensorPage({super.key});
@@ -28,12 +29,96 @@ class _SensorPageState extends State<SensorPage> {
   int _inactiveCount = 0;
   static const Duration requiredShakeDuration = Duration(milliseconds: 500);
 
+  late io.Socket socket;
+  String _connectionStatus = 'Офлайн';
+
+  final String _userId = 'user_${Random().nextInt(9000) + 1000}';
+  String? _lastBumpedUserId;
+
   @override
   void initState() {
     super.initState();
+    _initSocketConnection();
     _initLocation();
     _initAccelerometer();
     _checkVibrationSupport();
+  }
+
+  void _initSocketConnection() {
+    socket = io.io('http://192.168.0.10:5000', {
+      'transports': ['websocket'],
+      'query': {'userId': _userId}
+    });
+
+    socket.onConnect((_) {
+      setState(() => _connectionStatus = 'Онлайн');
+      
+      // Регистрация пользователя
+      socket.emit('register', _userId);
+
+      // Событие тряски от другого устройства
+      socket.on('bump_event', (data) {
+        _handleIncomingBump(data);
+      });
+    });
+
+    socket.onDisconnect((_) => setState(() => _connectionStatus = 'Офлайн'));
+  }
+
+  void _handleIncomingBump(String otherUserId) {
+    setState(() {
+      _lastBumpedUserId = otherUserId;
+    });
+    
+    Vibration.vibrate(duration: 500);
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Успешный бамп!'),
+        content: Text('Вы соединились с пользователем $otherUserId'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _sendBumpToServer() async {
+    if (_currentPosition == null) return;
+
+    final bumpData = {
+      'senderId': _userId,
+      'timestamp': DateTime.now().toIso8601String(),
+      'lat': _currentPosition!.latitude,
+      'lng': _currentPosition!.longitude,
+      'accuracy': _currentPosition!.accuracy,
+      'speed': _currentPosition!.speed,
+    };
+
+    socket.emit('bump', bumpData);
+
+
+    // Implement your server communication here
+    // You would typically send:
+    // - Current timestamp
+    // - Device ID or user ID
+    // - Current location (_currentPosition)
+    print('Bump detected at ${_currentPosition?.toJson()}');
+    
+    // In a real app, you would use something like:
+    // final response = await http.post(
+    //   Uri.parse('your-server-endpoint'),
+    //   body: jsonEncode({
+    //     'userId': 'user123',
+    //     'timestamp': DateTime.now().toIso8601String(),
+    //     'location': _currentPosition?.toJson(),
+    //   }),
+    // );
+
   }
 
   Future<void> _checkVibrationSupport() async {
@@ -45,13 +130,13 @@ class _SensorPageState extends State<SensorPage> {
   }
 
   Future<void> _initLocation() async {
-  bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!serviceEnabled) {
-    setState(() {
-      _locationStatus = 'Location services are disabled.';
-    });
-    return;
-  }
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      setState(() {
+        _locationStatus = 'Location services are disabled.';
+      });
+      return;
+    }
 
   LocationPermission permission = await Geolocator.checkPermission();
   if (permission == LocationPermission.denied) {
@@ -76,7 +161,7 @@ class _SensorPageState extends State<SensorPage> {
     accuracy: LocationAccuracy.high,
     distanceFilter: 10,
   );
-  
+    
   Geolocator.getPositionStream(locationSettings: locationSettings)
     .listen((Position position) {
       setState(() {
@@ -131,7 +216,7 @@ class _SensorPageState extends State<SensorPage> {
     double average = _accelerationHistory.reduce((a, b) => a + b) / _accelerationHistory.length;
     
     // Threshold for bump detection (adjust as needed)
-    const double bumpThreshold = 20.0;  // минимальная
+    const double bumpThreshold = 15.0;  // минимальная
     const double differenceThreshold = 5.0; // Насколько текущее ускорение должно превышать среднее
     
     // Check if current acceleration is significantly higher than average
@@ -170,48 +255,42 @@ class _SensorPageState extends State<SensorPage> {
       _isShaking = false;
     });
     
-    // do some Vibrations
     if (await Vibration.hasVibrator() ?? false) {
-      Vibration.vibrate(duration: 1000); // 800ms
-      //await Future.delayed(const Duration(milliseconds: 400)); // 400ms pause
-      //Vibration.vibrate(duration: 200); // extra vibro 200ms
+      Vibration.vibrate(duration: 1000);
     }
     
-    _sendBumpToServer();
+    await _sendBumpToServer();
     _lastBumpTime = DateTime.now();
   }
 
-  void _sendBumpToServer() {
-    // Implement your server communication here
-    // You would typically send:
-    // - Current timestamp
-    // - Device ID or user ID
-    // - Current location (_currentPosition)
-    print('Bump detected at ${_currentPosition?.toJson()}');
-    
-    // In a real app, you would use something like:
-    // final response = await http.post(
-    //   Uri.parse('your-server-endpoint'),
-    //   body: jsonEncode({
-    //     'userId': 'user123',
-    //     'timestamp': DateTime.now().toIso8601String(),
-    //     'location': _currentPosition?.toJson(),
-    //   }),
-    // );
-  }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bump Detection'),
-        backgroundColor: Colors.blueAccent,
+        actions: [
+          Chip(
+            label: Text(_connectionStatus),
+            backgroundColor: _connectionStatus == 'Онлайн' 
+              ? Colors.green[100] 
+              : Colors.red[100],
+          )
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+
+            Text(
+              'Ваш ID: $_userId',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+
             // Location Section
             const Text(
               'Location Data:',
@@ -280,5 +359,10 @@ class _SensorPageState extends State<SensorPage> {
         ),
       ),
     );
+  }
+  @override
+  void dispose() {
+    socket.disconnect();
+    super.dispose();
   }
 }
