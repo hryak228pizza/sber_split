@@ -45,7 +45,7 @@ class _SensorPageState extends State<SensorPage> {
   }
 
   void _initSocketConnection() {
-    socket = io.io('http://192.168.0.10:5000', {
+    socket = io.io('https://bump-server-7eq2.onrender.com/', {
       'transports': ['websocket'],
       'query': {'userId': _userId}
     });
