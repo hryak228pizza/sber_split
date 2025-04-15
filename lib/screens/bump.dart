@@ -286,7 +286,7 @@ class _SensorPageState extends State<SensorPage> {
           children: [
 
             Text(
-              'Ваш ID: $_userId',
+              'Your ID: $_userId',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
