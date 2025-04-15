@@ -10,6 +10,11 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Need microphone access for video recording</string>
 
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs access to location for bump detection feature</string>
+	<key>NSMotionUsageDescription</key>
+	<string>This app needs access to motion sensors for bump detection</string>
+
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
