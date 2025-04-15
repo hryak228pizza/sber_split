@@ -5,9 +5,11 @@ from geopy.distance import geodesic
 import logging
 import eventlet
 
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 socketio = SocketIO(app, cors_allowed_origins="*")
+eventlet.monkey_patch()
 
 # Хранилище данных
 users = {}  # {user_id: {'sid': sid, 'position': (lat, lng)}}
@@ -162,5 +164,4 @@ if __name__ == '__main__':
     print(f"API endpoint: http://localhost:5000/bumps")
     
     # socketio.run(app, host='0.0.0.0', port=5000, debug=True)
-    eventlet.monkey_patch()
     socketio.run(app, host='0.0.0.0', port=10000)
