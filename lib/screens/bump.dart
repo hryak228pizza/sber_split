@@ -6,6 +6,8 @@ import 'package:vibration/vibration.dart';
 import 'package:geolocator_android/geolocator_android.dart';
 import 'package:geolocator_apple/geolocator_apple.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:provider/provider.dart';
+import '../providers/order_provider.dart';
 
 class SensorPage extends StatefulWidget {
   const SensorPage({super.key});
@@ -35,9 +37,13 @@ class _SensorPageState extends State<SensorPage> {
   final String _userId = 'user_${Random().nextInt(9000) + 1000}';
   String? _lastBumpedUserId;
 
+  List<String> _bumpedUsers = [];
+  String? _receiptId; // В реальном приложении это будет ID чека
+
   @override
   void initState() {
     super.initState();
+    _receiptId = 'receipt_${Random().nextInt(10000)}'; // случайный ID чека
     _initSocketConnection();
     _initLocation();
     _initAccelerometer();
@@ -45,7 +51,8 @@ class _SensorPageState extends State<SensorPage> {
   }
 
   void _initSocketConnection() {
-    socket = io.io('http://192.168.0.10:5000', {
+    socket = io.io('https://bump-server-7eq2.onrender.com/', {
+    //socket = io.io('http://192.168.0.10:5000', {
       'transports': ['websocket'],
       'query': {'userId': _userId}
     });
@@ -65,25 +72,67 @@ class _SensorPageState extends State<SensorPage> {
     socket.onDisconnect((_) => setState(() => _connectionStatus = 'Офлайн'));
   }
 
-  void _handleIncomingBump(String otherUserId) {
+  void _handleIncomingBump(data) {
+    final isAdmin = Provider.of<ReceiptProvider>(context, listen: false).isAdmin;
+
+    if (isAdmin) {
+      // Если мы админ - собираем ID пользователей
+      setState(() {
+        _bumpedUsers.add(data['sender_id']);
+        _bumpedUsers = _bumpedUsers.toSet().toList(); // Убираем дубликаты
+      });
+      
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Новый участник'),
+          content: Text('Бамп с ${data['sender_id']}\nВсего участников: ${_bumpedUsers.length}'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Если мы участник - получаем чек
+      if (data['receipt_id'] != null) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Получен чек'),
+            content: Text('ID чека: ${data['receipt_id']}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  void _sendReceiptToParticipants() {
+    if (_bumpedUsers.isEmpty) return;
+    
+    for (var userId in _bumpedUsers) {
+      socket.emit('bump_event', {
+        'receiver_id': userId,
+        'sender_id': _userId,
+        'receipt_id': _receiptId,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    }
+    
     setState(() {
-      _lastBumpedUserId = otherUserId;
+      _bumpedUsers = [];
     });
     
-    Vibration.vibrate(duration: 500);
-    
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Успешный бамп!'),
-        content: Text('Вы соединились с пользователем $otherUserId'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Чек отправлен ${_bumpedUsers.length} участникам')),
     );
   }
 
@@ -216,7 +265,7 @@ class _SensorPageState extends State<SensorPage> {
     double average = _accelerationHistory.reduce((a, b) => a + b) / _accelerationHistory.length;
     
     // Threshold for bump detection (adjust as needed)
-    const double bumpThreshold = 15.0;  // минимальная
+    const double bumpThreshold = 10.0;  // минимальная
     const double differenceThreshold = 5.0; // Насколько текущее ускорение должно превышать среднее
     
     // Check if current acceleration is significantly higher than average
@@ -284,6 +333,12 @@ class _SensorPageState extends State<SensorPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+
+            if (Provider.of<ReceiptProvider>(context, listen: false).isAdmin && _bumpedUsers.isNotEmpty)
+              ElevatedButton(
+                onPressed: _sendReceiptToParticipants,
+                child: Text('Отправить чек ${_bumpedUsers.length} участникам'),
+              ),
 
             Text(
               'Your ID: $_userId',

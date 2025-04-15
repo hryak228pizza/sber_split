@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image/image.dart' as img;
 import 'bump.dart';
+import 'package:provider/provider.dart';
+import '../providers/order_provider.dart';
 
 class CropReceiptScreen extends StatefulWidget {
   final File image;
@@ -134,6 +136,7 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
               padding: const EdgeInsets.all(20.0),
               child: ElevatedButton(
                 onPressed: () {
+                  Provider.of<ReceiptProvider>(context, listen: false).setAdmin(true);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -141,7 +144,7 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
                     ),
                   );
                 },
-                child: const Text('Перейти к функции тряски'),
+                child: const Text('Перейти к функции тряски как администратор'),
               ),
             ),
           ],
