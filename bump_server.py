@@ -3,6 +3,7 @@ from flask_socketio import SocketIO, emit
 from datetime import datetime
 from geopy.distance import geodesic
 import logging
+import eventlet
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
@@ -160,4 +161,6 @@ if __name__ == '__main__':
     print(f"Dashboard available at: http://localhost:5000")
     print(f"API endpoint: http://localhost:5000/bumps")
     
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    # socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    eventlet.monkey_patch()
+    socketio.run(app, host='0.0.0.0', port=10000)
