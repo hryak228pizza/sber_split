@@ -1,19 +1,27 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../models/receipt_item.dart';
 import '../services/image_service.dart';
 
 class ReceiptProvider extends ChangeNotifier {
   final ImageService _imageService;
   File? _image;
   bool _isAdmin = false;
+  List<ReceiptItem> _receiptItems = [];
 
   ReceiptProvider(this._imageService);
 
   File? get image => _image;
   bool get isAdmin => _isAdmin;
+  List<ReceiptItem> get receiptItems => _receiptItems;
 
   void setAdmin(bool value) {
     _isAdmin = value;
+    notifyListeners();
+  }
+
+  void setReceiptItems(List<ReceiptItem> items) {
+    _receiptItems = items;
     notifyListeners();
   }
 

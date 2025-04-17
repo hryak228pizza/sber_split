@@ -6,6 +6,8 @@ import 'package:image/image.dart' as img;
 import 'bump.dart';
 import 'package:provider/provider.dart';
 import '../providers/order_provider.dart';
+import '../models/receipt_item.dart';
+import 'split_receipt_screen.dart';
 
 class CropReceiptScreen extends StatefulWidget {
   final File image;
@@ -132,19 +134,43 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
                 child: const Text('Применить обрезку'),
               ),
             ),
+            // Padding(
+            //   padding: const EdgeInsets.all(20.0),
+            //   child: ElevatedButton(
+            //     onPressed: () {
+            //       Provider.of<ReceiptProvider>(context, listen: false).setAdmin(true);
+            //       Navigator.push(
+            //         context,
+            //         MaterialPageRoute(
+            //           builder: (context) => const SensorPage(),
+            //         ),
+            //       );
+            //     },
+            //     child: const Text('Разделить счет'),
+            //   ),
+            // ),
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: ElevatedButton(
                 onPressed: () {
-                  Provider.of<ReceiptProvider>(context, listen: false).setAdmin(true);
+                  // Тестовые данные чека (в реальном приложении будет OCR)
+                  final testItems = [
+                    ReceiptItem(name: 'Кофе', price: 150.0),
+                    ReceiptItem(name: 'Бургер', price: 250.0),
+                    ReceiptItem(name: 'Картофель фри', price: 120.0),
+                    ReceiptItem(name: 'Кофе', price: 150.0),
+                    ReceiptItem(name: 'Салат', price: 180.0),
+                  ];
+                  
+                  Provider.of<ReceiptProvider>(context, listen: false)
+                      .setReceiptItems(testItems);
+                      
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const SensorPage(),
-                    ),
+                    MaterialPageRoute(builder: (context) => const SplitReceiptScreen()),
                   );
                 },
-                child: const Text('Перейти к функции тряски как администратор'),
+                child: const Text('Распознать чек'),
               ),
             ),
           ],

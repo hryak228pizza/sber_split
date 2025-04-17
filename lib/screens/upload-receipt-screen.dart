@@ -56,7 +56,7 @@ class UploadReceiptScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (context) => const SensorPage()),
               );
             },
-            child: const Text('Перейти к бампу как участник'),
+            child: const Text('Получить счет'),
           ),
         ],
       ),

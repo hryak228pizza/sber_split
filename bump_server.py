@@ -138,7 +138,7 @@ def handle_bump(data):
                     receiver_data['position']
                 ).meters
                 
-                if distance < 50:
+                if distance < 2:
                     # Отправляем событие получателю
                     emit('bump_event', {
                         'event_type': 'bump',

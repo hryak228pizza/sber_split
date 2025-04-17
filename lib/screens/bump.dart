@@ -8,6 +8,7 @@ import 'package:geolocator_apple/geolocator_apple.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:provider/provider.dart';
 import '../providers/order_provider.dart';
+import '../models/receipt_item.dart';
 
 class SensorPage extends StatefulWidget {
   const SensorPage({super.key});
@@ -30,6 +31,7 @@ class _SensorPageState extends State<SensorPage> {
   DateTime? _shakeStartTime;
   int _inactiveCount = 0;
   static const Duration requiredShakeDuration = Duration(milliseconds: 500);
+  bool _equalSplit = true;
 
   late io.Socket socket;
   String _connectionStatus = 'Офлайн';
@@ -48,6 +50,18 @@ class _SensorPageState extends State<SensorPage> {
     _initLocation();
     _initAccelerometer();
     _checkVibrationSupport();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Переносим получение аргументов маршрута сюда
+    final routeArgs = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (routeArgs != null) {
+      setState(() {
+        _equalSplit = routeArgs['equalSplit'] ?? true;
+      });
+    }
   }
 
   void _initSocketConnection() {
@@ -97,12 +111,44 @@ class _SensorPageState extends State<SensorPage> {
       );
     } else {
       // Если мы участник - получаем чек
-      if (data['receipt_id'] != null) {
+      if (data['items'] != null) {
+        final items = (data['items'] as List)
+            .map((item) => ReceiptItem(
+                  name: item['name'],
+                  price: item['price'].toDouble(),
+                  quantity: item['quantity'],
+                ))
+            .toList();
+        
+        final equalSplit = data['equal_split'] ?? true;
+        final total = items.fold(0.0, (sum, item) => sum + item.total);
+        final share = equalSplit ? total : total; // логика для выборочного разделения 
+
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Получен чек'),
-            content: Text('ID чека: ${data['receipt_id']}'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Позиции:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  for (var item in items)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Text('${item.name} × ${item.quantity} - ${item.total.toStringAsFixed(2)} руб.'),
+                    ),
+                  const Divider(),
+                  Text(
+                    equalSplit
+                        ? 'Общая сумма: ${total.toStringAsFixed(2)} руб.\nВаша доля: ${share.toStringAsFixed(2)} руб.'
+                        : 'Выберите свои позиции',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -117,6 +163,9 @@ class _SensorPageState extends State<SensorPage> {
 
   void _sendReceiptToParticipants() {
     if (_bumpedUsers.isEmpty) return;
+
+    final receiptProvider = Provider.of<ReceiptProvider>(context, listen: false);
+    final receiptItems = receiptProvider.receiptItems;
     
     for (var userId in _bumpedUsers) {
       socket.emit('bump_event', {
@@ -124,6 +173,12 @@ class _SensorPageState extends State<SensorPage> {
         'sender_id': _userId,
         'receipt_id': _receiptId,
         'timestamp': DateTime.now().toIso8601String(),
+        'items': receiptItems.map((item) => {
+          'name': item.name,
+          'price': item.price,
+          'quantity': item.quantity,
+          }).toList(),
+        'equal_split': _equalSplit,
       });
     }
     
@@ -266,7 +321,7 @@ class _SensorPageState extends State<SensorPage> {
     
     // Threshold for bump detection (adjust as needed)
     const double bumpThreshold = 10.0;  // минимальная
-    const double differenceThreshold = 5.0; // Насколько текущее ускорение должно превышать среднее
+    const double differenceThreshold = 4.0; // Насколько текущее ускорение должно превышать среднее
     
     // Check if current acceleration is significantly higher than average
     if (currentAcceleration > bumpThreshold && 
@@ -291,6 +346,7 @@ class _SensorPageState extends State<SensorPage> {
         _inactiveCount++;
         if (_inactiveCount > 3) {
           setState(() => _isShaking = false);
+          _shakeStartTime = null;
         }
       } else {
         _inactiveCount = 0;
@@ -302,6 +358,7 @@ class _SensorPageState extends State<SensorPage> {
     setState(() {
       _bumpStatus = 'BUMP! (${DateTime.now().toLocal().toString().substring(11, 19)})';
       _isShaking = false;
+      _shakeStartTime = null;
     });
     
     if (await Vibration.hasVibrator() ?? false) {
