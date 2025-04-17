@@ -78,8 +78,11 @@ def handle_bump_event(data):
         emit('bump_event', {
             'sender_id': sender_id,
             'receipt_id': data.get('receipt_id'),
-            'timestamp': data.get('timestamp')
+            'timestamp': data.get('timestamp'),
+            'items': data.get('items', []),
+            'equal_split': data.get('equal_split', True)
         }, room=users[receiver_id]['sid'])
+        print(f"Receipt sent to {receiver_id}")  # лог для отладки
 
 @socketio.on('bump')
 def handle_bump(data):
@@ -138,7 +141,7 @@ def handle_bump(data):
                     receiver_data['position']
                 ).meters
                 
-                if distance < 2:
+                if distance < 5:
                     # Отправляем событие получателю
                     emit('bump_event', {
                         'event_type': 'bump',

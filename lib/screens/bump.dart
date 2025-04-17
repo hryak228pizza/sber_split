@@ -182,13 +182,15 @@ class _SensorPageState extends State<SensorPage> {
       });
     }
     
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Чек отправлен ${_bumpedUsers.length} участникам')),
+    );
+    
     setState(() {
       _bumpedUsers = [];
     });
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Чек отправлен ${_bumpedUsers.length} участникам')),
-    );
+    
   }
 
   Future<void> _sendBumpToServer() async {
