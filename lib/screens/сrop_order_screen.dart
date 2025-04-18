@@ -39,17 +39,8 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final Map<String, dynamic> receiptData = await ReceiptOcrService().sendReceiptImage(_image);
+      final items = await ReceiptOcrService().sendReceiptImage(_image);
       
-      // Преобразуем в List<ReceiptItem>
-      final items = receiptData.entries
-          .where((e) => e.key != "Итого")
-          .map((e) => ReceiptItem(
-                name: e.key,
-                price: (e.value as num).toDouble(),
-              ))
-          .toList();
-
       Provider.of<ReceiptProvider>(context, listen: false)
           .setReceiptItems(items);
           
@@ -212,12 +203,7 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
                   try {
                     final response = await ReceiptOcrService().sendReceiptImage(_image);
                     
-                    final parsedData = (response);
-                    
-                    final items = parsedData.entries
-                        .where((e) => e.key != "Итого")
-                        .map((e) => ReceiptItem(name: e.key, price: e.value.toDouble()))
-                        .toList();
+                    final items = await ReceiptOcrService().sendReceiptImage(_image);
 
                     Provider.of<ReceiptProvider>(context, listen: false)
                         .setReceiptItems(items);
