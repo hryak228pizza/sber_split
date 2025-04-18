@@ -1,10 +1,104 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'dart:convert';
 import '../providers/order_provider.dart';
-import 'bump.dart';
 
 class SplitReceiptScreen extends StatelessWidget {
   const SplitReceiptScreen({super.key});
+
+  String _generateReceiptJson(BuildContext context) {
+    final provider = Provider.of<ReceiptProvider>(context, listen: false);
+    final items = provider.receiptItems;
+    
+    final receiptData = {
+      'items': items.map((item) => {
+        'name': item.name,
+        'price': item.price,
+        'quantity': item.quantity,
+      }).toList(),
+      'total': items.fold(0.0, (sum, item) => sum + item.total),
+      'date': DateTime.now().toIso8601String(),
+    };
+    
+    return jsonEncode(receiptData);
+  }
+
+  Future<void> _shareReceipt(BuildContext context) async {
+    final receiptJson = _generateReceiptJson(context);
+    final receiptString = base64Url.encode(utf8.encode(receiptJson));
+    final shareLink = 'sbersplit://receipt/$receiptString';
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 300,
+            maxHeight: 400,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Поделиться чеком',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                  ),
+                  child: QrImageView(
+                    data: shareLink,
+                    version: QrVersions.auto,
+                    size: 200,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  shareLink,
+                  style: const TextStyle(fontSize: 12),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Закрыть'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Share.share(
+                          'Привет! Вот мой чек для разделения: $shareLink',
+                          subject: 'Чек SberSplit',
+                        );
+                      },
+                      child: const Text('Поделиться'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,44 +106,10 @@ class SplitReceiptScreen extends StatelessWidget {
     final items = provider.receiptItems;
     final total = items.fold(0.0, (sum, item) => sum + item.total);
 
-    // Проверяем есть ли пропущенные позиции (с null значениями)
-    final hasSkippedItems = items.any((item) => item.name.isEmpty || item.price == 0);
-
-    // Показываем alert при наличии пропущенных позиций
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (hasSkippedItems) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Внимание'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min, 
-              children: [
-                Image.asset(
-                  'assets/images/sbercat1.jpg', 
-                  height: 100, 
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 16),
-                const Text('Некоторые позиции не были распознаны и были пропущены.'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      }
-    });
-
     return Scaffold(
       appBar: AppBar(title: const Text('Разделить чек')),
       body: Column(
         children: [
-          // Итоговая стоимость
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Card(
@@ -77,8 +137,6 @@ class SplitReceiptScreen extends StatelessWidget {
               ),
             ),
           ),
-
-          // Список позиций
           Expanded(
             child: ListView.builder(
               itemCount: items.length,
@@ -95,8 +153,6 @@ class SplitReceiptScreen extends StatelessWidget {
               },
             ),
           ),
-
-          // Кнопки разделения
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -106,12 +162,10 @@ class SplitReceiptScreen extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: () {
                       provider.setAdmin(true);
-                      Navigator.push(
+                      Navigator.pushNamed(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const SensorPage(),
-                          settings: RouteSettings(arguments: {'equalSplit': true}),
-                        ),
+                        '/sensor',
+                        arguments: {'equalSplit': true},
                       );
                     },
                     child: const Text('Разделить поровну'),
@@ -123,15 +177,27 @@ class SplitReceiptScreen extends StatelessWidget {
                   child: OutlinedButton(
                     onPressed: () {
                       provider.setAdmin(true);
-                      Navigator.push(
+                      Navigator.pushNamed(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const SensorPage(),
-                          settings: RouteSettings(arguments: {'equalSplit': false}),
-                        ),
+                        '/sensor',
+                        arguments: {'equalSplit': false},
                       );
                     },
                     child: const Text('Разделить выборочно'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => _shareReceipt(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                    ),
+                    child: const Text(
+                      'Поделиться чеком',
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                 ),
               ],
