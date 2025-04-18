@@ -9,6 +9,57 @@ import '../providers/order_provider.dart';
 class SplitReceiptScreen extends StatelessWidget {
   const SplitReceiptScreen({super.key});
 
+  void _showGigaChatDialog(BuildContext context) {
+    final items = Provider.of<ReceiptProvider>(context, listen: false).receiptItems;
+    final total = items.fold(0.0, (sum, item) => sum + item.total);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('GigaChat рекомендует'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('ИИ проанализировал ваш чек и предлагает:'),
+            const SizedBox(height: 16),
+            for (var item in items)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Text('• ${item.name}: ${item.total.toStringAsFixed(2)} руб.'),
+              ),
+            const Divider(),
+            Text(
+              'Общая сумма: ${total.toStringAsFixed(2)} руб.',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'GigaChat советует разделить поровну',
+              style: TextStyle(fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              // Здесь будет вызов API GigaChat в будущем
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Запрос к GigaChat отправлен')),
+              );
+            },
+            child: const Text('Принять рекомендацию'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _generateReceiptJson(BuildContext context) {
     final provider = Provider.of<ReceiptProvider>(context, listen: false);
     final items = provider.receiptItems;
@@ -184,6 +235,20 @@ class SplitReceiptScreen extends StatelessWidget {
                       );
                     },
                     child: const Text('Разделить выборочно'),
+                  ),
+                ),                
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => _showGigaChatDialog(context),
+                    style: ElevatedButton.styleFrom(
+                      //backgroundColor: Colors.green, 
+                    ),
+                    child: const Text(
+                      'Довериться GigaChat',
+                      //style: TextStyle(color: Colors.dark),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),

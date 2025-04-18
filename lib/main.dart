@@ -26,6 +26,9 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
       ),
       home: const WelcomeScreen(),
+      routes: {
+        '/sensor': (context) => const SensorPage(),
+      },
     );
   }
 }
