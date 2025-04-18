@@ -1,16 +1,25 @@
-# sber_split
+# Bill Blast
 
-A new Flutter project.
+Новое мобильное приложение для разделения счета в ресторанах поможет Вам удобно распределить счет между участниками, предлагая удобный и интуитивно понятный интерфейс.
+Разработано для Сбербанка в рамках кейс-чемпионата ProЦифру.
 
-## Getting Started
+## Структура проекта
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+sber_split/
+├── android/                # Android-специфичный код
+├── ios/                    # iOS-специфичный код
+├── lib/                    # Основной код приложения
+│   └── providers/          # Реализация функционала перехода между страницами
+│   └── screens/            # Страницы реализации приложения
+│   └── services/           # Необходимый функционал внешних библиотек
+│   └── models/             # Структуры данных
+├── linux/                  # Linux-специфичная конфигурация
+├── macos/                  # macOS-специфичный код
+├── test/                   # Тесты
+├── web/                    # Web-сборка
+├── windows/                # Windows-сборка
+├── analysis_options.yaml   # Настройки анализатора Dart
+├── bump_server.py          # Серверная часть
+├── pubspec.lock            # Точные версии зависимостей
+├── pubspec.yaml            # Конфигурация проекта и зависимости 
+├── requirements.txt        # Python-зависимости для сервера
