@@ -1,4 +1,6 @@
-# Bill Blast ![logo](https://github.com/user-attachments/assets/ff66971e-44fb-4ea9-b0b8-ec78bc30fc29)
+![image](https://github.com/user-attachments/assets/aed80cf2-c19b-4b73-bd5c-fb3ab60b1b1b)
+
+# Bill Blast
 
 Новое мобильное приложение для разделения счета в ресторанах поможет Вам удобно распределить счет между участниками, предлагая удобный и интуитивно понятный интерфейс.
 Разработано для Сбербанка в рамках кейс-чемпионата ProЦифру.
