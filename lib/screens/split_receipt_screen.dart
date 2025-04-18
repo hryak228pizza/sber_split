@@ -22,7 +22,18 @@ class SplitReceiptScreen extends StatelessWidget {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Внимание'),
-            content: const Text('Некоторые позиции не были распознаны и были пропущены.'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min, 
+              children: [
+                Image.asset(
+                  'assets/images/sbercat1.jpg', 
+                  height: 100, 
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 16),
+                const Text('Некоторые позиции не были распознаны и были пропущены.'),
+              ],
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
