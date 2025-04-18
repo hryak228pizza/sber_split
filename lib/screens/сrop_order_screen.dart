@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../providers/order_provider.dart';
 import '../models/receipt_item.dart';
 import 'split_receipt_screen.dart';
+import '../services/receipt_ocr_service.dart';
+import 'dart:convert';
 
 class CropReceiptScreen extends StatefulWidget {
   final File image;
@@ -24,11 +26,44 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
   Rect _cropRect = Rect.zero;
   Offset _startDrag = Offset.zero;
   bool _isDragging = false;
+  final ReceiptOcrService _ocrService = ReceiptOcrService();
+  bool _isLoading  = false;
 
   @override
   void initState() {
     super.initState();
     _image = widget.image;
+  }
+
+  Future<void> _processReceipt() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final Map<String, dynamic> receiptData = await ReceiptOcrService().sendReceiptImage(_image);
+      
+      // Преобразуем в List<ReceiptItem>
+      final items = receiptData.entries
+          .where((e) => e.key != "Итого")
+          .map((e) => ReceiptItem(
+                name: e.key,
+                price: (e.value as num).toDouble(),
+              ))
+          .toList();
+
+      Provider.of<ReceiptProvider>(context, listen: false)
+          .setReceiptItems(items);
+          
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SplitReceiptScreen()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _cropImage() async {
@@ -152,25 +187,57 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: ElevatedButton(
-                onPressed: () {
-                  // Тестовые данные чека (в реальном приложении будет OCR)
-                  final testItems = [
-                    ReceiptItem(name: 'Кофе', price: 150.0),
-                    ReceiptItem(name: 'Бургер', price: 250.0),
-                    ReceiptItem(name: 'Картофель фри', price: 120.0),
-                    ReceiptItem(name: 'Кофе', price: 150.0),
-                    ReceiptItem(name: 'Салат', price: 180.0),
-                  ];
+                // onPressed: () {
+                //   // Тестовые данные чека (в реальном приложении будет OCR)
+                //   final testItems = [
+                //     ReceiptItem(name: 'Кофе', price: 150.0),
+                //     ReceiptItem(name: 'Бургер', price: 250.0),
+                //     ReceiptItem(name: 'Картофель фри', price: 120.0),
+                //     ReceiptItem(name: 'Кофе', price: 150.0),
+                //     ReceiptItem(name: 'Салат', price: 180.0),
+                //   ];
                   
-                  Provider.of<ReceiptProvider>(context, listen: false)
-                      .setReceiptItems(testItems);
+                //   Provider.of<ReceiptProvider>(context, listen: false)
+                //       .setReceiptItems(testItems);
                       
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const SplitReceiptScreen()),
-                  );
+                //   Navigator.push(
+                //     context,
+                //     MaterialPageRoute(builder: (context) => const SplitReceiptScreen()),
+                //   );
+                // },
+
+                onPressed: () async {
+                  setState(() => _isLoading = true);
+
+                  try {
+                    final response = await ReceiptOcrService().sendReceiptImage(_image);
+                    
+                    final parsedData = (response);
+                    
+                    final items = parsedData.entries
+                        .where((e) => e.key != "Итого")
+                        .map((e) => ReceiptItem(name: e.key, price: e.value.toDouble()))
+                        .toList();
+
+                    Provider.of<ReceiptProvider>(context, listen: false)
+                        .setReceiptItems(items);
+                        
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const SplitReceiptScreen(),
+                    ));
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Ошибка: $e')),
+                    );
+                  } finally {
+                    setState(() => _isLoading = false);
+                  }
                 },
-                child: const Text('Распознать чек'),
+                child: _isLoading 
+                    ? const CircularProgressIndicator()
+                    : const Text('Распознать чек'),
+              // ),
+              //   child: const Text('Распознать чек'),
               ),
             ),
           ],
