@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sber_split/screens/%D1%81rop_order_screen.dart';
 import '../providers/order_provider.dart';
+import 'bump.dart';
 
 class UploadReceiptScreen extends StatelessWidget {
   const UploadReceiptScreen({super.key});
@@ -46,6 +47,16 @@ class UploadReceiptScreen extends StatelessWidget {
                   }
                 : null,
             child: Text('Обрезать изображение'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Provider.of<ReceiptProvider>(context, listen: false).setAdmin(false);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SensorPage()),
+              );
+            },
+            child: const Text('Стать участником'),
           ),
         ],
       ),

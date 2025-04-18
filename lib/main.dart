@@ -3,6 +3,7 @@ import 'screens/upload-receipt-screen.dart';
 import 'services/image_service.dart';
 import 'package:provider/provider.dart';
 import 'providers/order_provider.dart';
+import 'screens/bump.dart';
 
 void main() {
   runApp(
@@ -24,6 +25,9 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
       ),
       home: const WelcomeScreen(),
+      routes: {
+        '/sensor': (context) => const SensorPage(),
+      },
     );
   }
 }

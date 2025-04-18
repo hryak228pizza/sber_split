@@ -6,6 +6,9 @@ import 'package:vibration/vibration.dart';
 import 'package:geolocator_android/geolocator_android.dart';
 import 'package:geolocator_apple/geolocator_apple.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:provider/provider.dart';
+import '../providers/order_provider.dart';
+import '../models/receipt_item.dart';
 
 class SensorPage extends StatefulWidget {
   const SensorPage({super.key});
@@ -28,6 +31,7 @@ class _SensorPageState extends State<SensorPage> {
   DateTime? _shakeStartTime;
   int _inactiveCount = 0;
   static const Duration requiredShakeDuration = Duration(milliseconds: 500);
+  bool _equalSplit = true;
 
   late io.Socket socket;
   String _connectionStatus = 'Офлайн';
@@ -35,17 +39,34 @@ class _SensorPageState extends State<SensorPage> {
   final String _userId = 'user_${Random().nextInt(9000) + 1000}';
   String? _lastBumpedUserId;
 
+  List<String> _bumpedUsers = [];
+  String? _receiptId; // В реальном приложении это будет ID чека
+
   @override
   void initState() {
     super.initState();
+    _receiptId = 'receipt_${Random().nextInt(10000)}'; // случайный ID чека
     _initSocketConnection();
     _initLocation();
     _initAccelerometer();
     _checkVibrationSupport();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Переносим получение аргументов маршрута сюда
+    final routeArgs = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (routeArgs != null) {
+      setState(() {
+        _equalSplit = routeArgs['equalSplit'] ?? true;
+      });
+    }
+  }
+
   void _initSocketConnection() {
     socket = io.io('https://bump-server-7eq2.onrender.com/', {
+    //socket = io.io('http://192.168.0.10:5000', {
       'transports': ['websocket'],
       'query': {'userId': _userId}
     });
@@ -65,26 +86,111 @@ class _SensorPageState extends State<SensorPage> {
     socket.onDisconnect((_) => setState(() => _connectionStatus = 'Офлайн'));
   }
 
-  void _handleIncomingBump(String otherUserId) {
+  void _handleIncomingBump(data) {
+    final isAdmin = Provider.of<ReceiptProvider>(context, listen: false).isAdmin;
+
+    if (isAdmin) {
+      // Если мы админ - собираем ID пользователей
+      setState(() {
+        _bumpedUsers.add(data['sender_id']);
+        _bumpedUsers = _bumpedUsers.toSet().toList(); // Убираем дубликаты
+      });
+      
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Новый участник'),
+          content: Text('Бамп с ${data['sender_id']}\nВсего участников: ${_bumpedUsers.length}'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Если мы участник - получаем чек
+      if (data['items'] != null) {
+        final items = (data['items'] as List)
+            .map((item) => ReceiptItem(
+                  name: item['name'],
+                  price: item['price'].toDouble(),
+                  quantity: item['quantity'],
+                ))
+            .toList();
+        
+        final equalSplit = data['equal_split'] ?? true;
+        final total = items.fold(0.0, (sum, item) => sum + item.total);
+        final share = equalSplit ? total : total; // логика для выборочного разделения 
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Получен чек'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Позиции:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  for (var item in items)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Text('${item.name} × ${item.quantity} - ${item.total.toStringAsFixed(2)} руб.'),
+                    ),
+                  const Divider(),
+                  Text(
+                    equalSplit
+                        ? 'Общая сумма: ${total.toStringAsFixed(2)} руб.\nВаша доля: ${share.toStringAsFixed(2)} руб.'
+                        : 'Выберите свои позиции',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  void _sendReceiptToParticipants() {
+    if (_bumpedUsers.isEmpty) return;
+
+    final receiptProvider = Provider.of<ReceiptProvider>(context, listen: false);
+    final receiptItems = receiptProvider.receiptItems;
+    
+    for (var userId in _bumpedUsers) {
+      socket.emit('bump_event', {
+        'receiver_id': userId,
+        'sender_id': _userId,
+        'receipt_id': _receiptId,
+        'timestamp': DateTime.now().toIso8601String(),
+        'items': receiptItems.map((item) => {
+          'name': item.name,
+          'price': item.price,
+          'quantity': item.quantity,
+          }).toList(),
+        'equal_split': _equalSplit,
+      });
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Чек отправлен ${_bumpedUsers.length} участникам')),
+    );
+    
     setState(() {
-      _lastBumpedUserId = otherUserId;
+      _bumpedUsers = [];
     });
     
-    Vibration.vibrate(duration: 500);
     
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Успешный бамп!'),
-        content: Text('Вы соединились с пользователем $otherUserId'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _sendBumpToServer() async {
@@ -216,8 +322,8 @@ class _SensorPageState extends State<SensorPage> {
     double average = _accelerationHistory.reduce((a, b) => a + b) / _accelerationHistory.length;
     
     // Threshold for bump detection (adjust as needed)
-    const double bumpThreshold = 15.0;  // минимальная
-    const double differenceThreshold = 5.0; // Насколько текущее ускорение должно превышать среднее
+    const double bumpThreshold = 10.0;  // минимальная
+    const double differenceThreshold = 4.0; // Насколько текущее ускорение должно превышать среднее
     
     // Check if current acceleration is significantly higher than average
     if (currentAcceleration > bumpThreshold && 
@@ -242,6 +348,7 @@ class _SensorPageState extends State<SensorPage> {
         _inactiveCount++;
         if (_inactiveCount > 3) {
           setState(() => _isShaking = false);
+          _shakeStartTime = null;
         }
       } else {
         _inactiveCount = 0;
@@ -253,6 +360,7 @@ class _SensorPageState extends State<SensorPage> {
     setState(() {
       _bumpStatus = 'BUMP! (${DateTime.now().toLocal().toString().substring(11, 19)})';
       _isShaking = false;
+      _shakeStartTime = null;
     });
     
     if (await Vibration.hasVibrator() ?? false) {
@@ -284,6 +392,12 @@ class _SensorPageState extends State<SensorPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+
+            if (Provider.of<ReceiptProvider>(context, listen: false).isAdmin && _bumpedUsers.isNotEmpty)
+              ElevatedButton(
+                onPressed: _sendReceiptToParticipants,
+                child: Text('Отправить чек ${_bumpedUsers.length} участникам'),
+              ),
 
             Text(
               'Your ID: $_userId',

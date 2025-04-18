@@ -5,7 +5,6 @@ from geopy.distance import geodesic
 import logging
 import eventlet
 
-
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -69,6 +68,21 @@ def handle_register(user_id):
         }
         logging.info(f'User registered: {user_id}')
         emit('registration_success', {'status': 'OK'})
+
+@socketio.on('bump_event')
+def handle_bump_event(data):
+    receiver_id = data.get('receiver_id')
+    sender_id = data.get('sender_id')
+    
+    if receiver_id in users:
+        emit('bump_event', {
+            'sender_id': sender_id,
+            'receipt_id': data.get('receipt_id'),
+            'timestamp': data.get('timestamp'),
+            'items': data.get('items', []),
+            'equal_split': data.get('equal_split', True)
+        }, room=users[receiver_id]['sid'])
+        print(f"Receipt sent to {receiver_id}")  # лог для отладки
 
 @socketio.on('bump')
 def handle_bump(data):
@@ -163,5 +177,5 @@ if __name__ == '__main__':
     print(f"Dashboard available at: http://localhost:5000")
     print(f"API endpoint: http://localhost:5000/bumps")
     
-    # socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    #socketio.run(app, host='0.0.0.0', port=5000, debug=True)
     socketio.run(app, host='0.0.0.0', port=10000)

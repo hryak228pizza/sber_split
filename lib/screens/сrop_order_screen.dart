@@ -4,6 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image/image.dart' as img;
 import 'bump.dart';
+import 'package:provider/provider.dart';
+import '../providers/order_provider.dart';
+import '../models/receipt_item.dart';
+import 'split_receipt_screen.dart';
+import '../services/receipt_ocr_service.dart';
+import 'dart:convert';
 
 class CropReceiptScreen extends StatefulWidget {
   final File image;
@@ -20,11 +26,35 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
   Rect _cropRect = Rect.zero;
   Offset _startDrag = Offset.zero;
   bool _isDragging = false;
+  final ReceiptOcrService _ocrService = ReceiptOcrService();
+  bool _isLoading  = false;
 
   @override
   void initState() {
     super.initState();
     _image = widget.image;
+  }
+
+  Future<void> _processReceipt() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final items = await ReceiptOcrService().sendReceiptImage(_image);
+      
+      Provider.of<ReceiptProvider>(context, listen: false)
+          .setReceiptItems(items);
+          
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SplitReceiptScreen()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _cropImage() async {
@@ -130,18 +160,70 @@ class _CropReceiptScreenState extends State<CropReceiptScreen> {
                 child: const Text('Применить обрезку'),
               ),
             ),
+            // Padding(
+            //   padding: const EdgeInsets.all(20.0),
+            //   child: ElevatedButton(
+            //     onPressed: () {
+            //       Provider.of<ReceiptProvider>(context, listen: false).setAdmin(true);
+            //       Navigator.push(
+            //         context,
+            //         MaterialPageRoute(
+            //           builder: (context) => const SensorPage(),
+            //         ),
+            //       );
+            //     },
+            //     child: const Text('Разделить счет'),
+            //   ),
+            // ),
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SensorPage(),
-                    ),
-                  );
+                // onPressed: () {
+                //   // Тестовые данные чека (в реальном приложении будет OCR)
+                //   final testItems = [
+                //     ReceiptItem(name: 'Кофе', price: 150.0),
+                //     ReceiptItem(name: 'Бургер', price: 250.0),
+                //     ReceiptItem(name: 'Картофель фри', price: 120.0),
+                //     ReceiptItem(name: 'Кофе', price: 150.0),
+                //     ReceiptItem(name: 'Салат', price: 180.0),
+                //   ];
+                  
+                //   Provider.of<ReceiptProvider>(context, listen: false)
+                //       .setReceiptItems(testItems);
+                      
+                //   Navigator.push(
+                //     context,
+                //     MaterialPageRoute(builder: (context) => const SplitReceiptScreen()),
+                //   );
+                // },
+
+                onPressed: () async {
+                  setState(() => _isLoading = true);
+
+                  try {
+                    final response = await ReceiptOcrService().sendReceiptImage(_image);
+                    
+                    final items = await ReceiptOcrService().sendReceiptImage(_image);
+
+                    Provider.of<ReceiptProvider>(context, listen: false)
+                        .setReceiptItems(items);
+                        
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const SplitReceiptScreen(),
+                    ));
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Ошибка: $e')),
+                    );
+                  } finally {
+                    setState(() => _isLoading = false);
+                  }
                 },
-                child: const Text('Перейти к функции тряски'),
+                child: _isLoading 
+                    ? const CircularProgressIndicator()
+                    : const Text('Распознать чек'),
+              // ),
+              //   child: const Text('Распознать чек'),
               ),
             ),
           ],
