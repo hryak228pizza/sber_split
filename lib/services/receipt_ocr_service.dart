@@ -8,13 +8,13 @@ class ReceiptOcrService {
 
   Future<List<ReceiptItem>> sendReceiptImage(File imageFile) async {
     try {
-        var request = http.MultipartRequest('POST', Uri.parse(_serverUrl));
-        request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+      var request = http.MultipartRequest('POST', Uri.parse(_serverUrl));
+      request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
 
-        var response = await request.send();
-        final responseBody = await response.stream.bytesToString();
+      var response = await request.send();
+      final responseBody = await response.stream.bytesToString();
 
-        if (response.statusCode == 200) {
+      if (response.statusCode == 200) {
         final serverResponse = json.decode(responseBody);
         final gigaReplyString = serverResponse['giga_reply'] as String;
         
@@ -27,29 +27,25 @@ class ReceiptOcrService {
         final gigaReply = json.decode(cleanJson) as Map<String, dynamic>;
         
         return gigaReply.entries
-            .where((entry) {
-                // Исключаем "Итого" и записи с null значениями
-                if (entry.key == "Итого") return false;
-                final value = entry.value as List?;
-                return value != null && 
-                    value.length >= 2 && 
-                    value[0] != null && 
-                    value[1] != null;
-            })
+            .where((entry) => entry.key != "Итого")
             .map((entry) {
-                final value = entry.value as List;
-                return ReceiptItem(
+              final value = entry.value as List?;
+              return ReceiptItem(
                 name: entry.key,
-                price: (value[0] as num).toDouble(),
-                quantity: (value[1] as num).toInt(),
-                );
+                price: (value != null && value.length >= 1 && value[0] != null) 
+                    ? (value[0] as num).toDouble() 
+                    : 0,
+                quantity: (value != null && value.length >= 2 && value[1] != null)
+                    ? (value[1] as num).toInt()
+                    : 1,
+              );
             })
             .toList();
-        } else {
+      } else {
         throw Exception('Ошибка сервера: ${response.statusCode}');
-        }
+      }
     } catch (e) {
-        throw Exception('Ошибка при обработке чека: $e');
+      throw Exception('Ошибка при обработке чека: $e');
     }
-    }
+  }
 }
