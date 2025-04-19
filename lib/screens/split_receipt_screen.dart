@@ -13,6 +13,39 @@ class SplitReceiptScreen extends StatelessWidget {
     final items = Provider.of<ReceiptProvider>(context, listen: false).receiptItems;
     final total = items.fold(0.0, (sum, item) => sum + item.total);
 
+     // Проверяем есть ли пропущенные позиции (с null значениями)
+    final hasSkippedItems = items.any((item) => item.name.isEmpty || item.price == 0);
+
+    // Показываем alert при наличии пропущенных позиций
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasSkippedItems) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Внимание'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min, 
+              children: [
+                Image.asset(
+                  'assets/images/sbercat1.jpg', 
+                  height: 100, 
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 16),
+                const Text('Некоторые позиции не были распознаны и были пропущены.'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    });
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
